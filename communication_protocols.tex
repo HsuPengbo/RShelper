@@ -1,0 +1,325 @@
+\documentclass{article}
+\usepackage[UTF8]{ctex}  
+\usepackage[hidelinks]{hyperref}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{left=0.5cm,right=0.5cm,top=1.0cm,bottom=2.0cm}
+\usepackage[dvipsnames, svgnames, x11names]{xcolor} 
+\usepackage{colortbl,booktabs}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,shadows} 
+\usepackage{verbatim}
+\newcommand{\tabincell}[2]{\begin{tabular}{@{}#1@{}}#2\end{tabular}}
+\usepackage{multirow}
+\begin{document}
+\begin{titlepage}
+\title{串口通信协议设计文档}
+\author{徐鹏博}
+\date{2020/10/9}
+\end{titlepage}
+
+\maketitle
+\tableofcontents{}
+\newpage{}
+\section{概述}
+\noindent 本文档规定\textbf{下位机}和\textbf{中心计算机}之间的基于\textbf{RS232总线}的通信协议，包括通信拓扑、通信格式、指令类型、指令定义的详细定义。
+\section{通信拓扑}
+\noindent 中心计算机与下位机的物体拓扑如下：\\ \\
+\begin{tikzpicture}
+
+\draw  (-7,5.5) rectangle(-4,-1.5);
+\draw (4,5.5) rectangle (7,-1.5);
+\draw [thick](-4,3.0) --(4,3.0);
+\draw [thick](-4,2.0) --(4,2.0);
+
+\draw (1.5,2.5) ellipse (0.6 and 1.3);
+
+\node at(-3,3.5){TXD};\node at(3,3.5){RXD};
+\node at(0,2.5){GND};
+
+\node at(-5.5,2.5){中心计算机};
+\node at(5.3,2.5){下位机};
+\end{tikzpicture}
+
+
+\section{工作原理}
+\subsection{RS-232标准}
+\noindent RS -232C 是美国电子工业协会 (EIA)正式公布的, 在异步串行通信中应用最广的标准总线。该标准适用于DCE和DTE间的串行二进制通信, 最高数据传送速率可达19.2kbps,最长传送电缆可达 15米。RS232C标准定义了25根引线, 对于一般的双向通信,只需使用串行输入RXD,串行输出 TXD 和地线 GND.RS -232C 标准的电平采用负逻辑,规定+3V～+15V之间的任意电平为逻辑“0”电平,-3V～-15V 之间的任意电平为逻辑“1”电平,与TTL和CMOS电平是不同的。在接口电路和计算机接口芯片中大都为TTL或CMOS电平,所以在通信时,必须进行电平转换,以便与RS232C标准的电平匹配。MAX232 芯片可以完成电平转换这一工作。\\
+
+\subsection{MAX232芯片}
+\noindent MAX232 芯片是 MAXIM 公司生产的低功耗、单电源双RS232发送/接收器。适用于各种EIA-232E和V.28/V.24的通信接口。MAX232芯片内部有一个电源电压变换器,可以把输入的+5V电源变换成RS-232C 输出电平所需 ±10V 电压, 所以采用此芯片接口的串行通信系统只要单一的+5V电源就可以。MAX232外围需要 4 个电解电容 C1、C2、C3、C4, 是内部电源转换所需电容.其取值均为1μF/25V.宜选用钽电容并且应尽量靠近芯片。C5为0.1μF的去耦电容。MAX232 的引脚T1IN、T2IN、R1OUT、R2OUT 为接 TTL/CMOS 电平的引脚。引脚 T1OUT、T2OUT、R1IN、R2IN为接 RS232C 电平的引脚.因此TTL/CMOS电平的T1IN、T2IN引脚应接MCS-51的串行发送引脚TXD;R1OUT、R2OUT应接MCS51的串行接收引脚RXD。与之对应的 RS232C 电平的 T1OUT、T2OUT应接PC机的接收端RD;R1IN、R2IN应接PC机的发送端TD。\\
+
+\begin{figure}[ht]
+\centering
+\includegraphics[scale=0.7]{pic1.png}
+\label{fig:label}
+\end{figure}
+
+\par
+
+\subsection{CRC校验}
+\noindent CRC即循环冗余校验码：是数据通信领域中最常用的一种查错校验码，其特征是信息字段和校验字段的长度可以任意选定。循环冗余检查（CRC）是一种数据传输检错功能，对数据进行多项式计算，并将得到的结果附在帧的后面，接收设备也执行类似的算法，以保证数据传输的正确性和完整性。 \\
+\textbf{基本原理} \\
+在K位信息码后再拼接R位的校验码，整个编码长度为N位，因此，这种编码又叫（N，K）码。对于一个给定的（N，K）码，可以证明存在一个最高次幂为N-K=R的多项式G(x)。根据G(x)可以生成K位信息的校验码，而G(x)叫做这个CRC码的生成多项式。
+校验码的具体生成过程为：假设发送信息用信息多项式C(X)表示，将C(x)左移R位，则可表示成C(x)*2R，这样C(x)的右边就会空出R位，这就是校验码的位置。通过C(x)*2R除以生成多项式G(x)得到的余数就是校验码。
+
+
+\section{通信格式}
+\noindent 在中心计算机与电源下位机通信过程中，每次都是由中心计算机发出命令帧，电源
+下位机收到命令帧后，立即执行命令。如果命令帧为轮询指令帧和温度采集指令帧，则
+电源下位机返回相应的遥测参数帧。
+\subsection{字节发送格式}
+
+\makeatletter\def\@captype{table}\makeatother
+\begin{tabular}  {|c|c|c|}  
+%\toprule[1pt]  
+\hline
+起始位  &数据位 &停止位\\  
+\hline
+0(最先发送)   & 8bit(D0-D7)   &1(最后发送)\\  
+\hline
+\end{tabular}  
+\\
+\subsection{通信速率}
+通信码速率最大为19200bps。
+
+\subsection{通信帧格式}
+中心机向电源下位机发出的控制指令格式，具体如表 1 所示的，它的指令参数为一个字节。电源下位机向中心机发出的遥测参数帧，为了保证串口通信质量，采取16位的CRC校验机制(占用两个字节)。
+\\
+\textbf{表1:命令帧通用格式}
+\\
+\makeatletter\def\@captype{table}\makeatother
+\begin{tabular}  {|r|c|c|c|}  
+%\toprule[1pt]   
+\hline
+序号  &字节定义(HEX) &描述 &备注\\  
+\hline
+1   &  EB   & 帧头 &\\  
+\hline
+2   &  90   & 帧头 &\\  
+\hline
+3   &  Cmd   & 指令类型 &\\  
+\hline
+4   &  Parameter   & 指令参数 & 1 字节 \\  
+\hline
+5   &  CheckCode   & \tabincell{c}{(指令类型+指令参数)的CRC校验码} & \tabincell{c}{指令类型和指令参数之和低8位的校验码} \\  
+\hline
+\end{tabular}  
+\\
+\\ 
+\textbf{表2:遥测参数帧通用格式}
+\\
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}  {|c|c|c|c|}
+%\toprule[1pt]  
+\hline
+序号  &字节定义(HEX) &描述 &备注\\   \hline
+1   &  EB   & 帧头 &\\   \hline
+2   &  90   & 帧头 &\\   \hline
+2   &  Cmd   & 节点号 &\\  \hline
+3   &  Parameter   & 应答参数 & 根据遥测参数帧要求若干字节 \\  \hline
+4   &  CheckCode   & \tabincell{c}{(指令计数+接收到的中心机命令+应答参数)的CRC校验码} & \tabincell{c}{节点号及应答参数和低8位的校验码} \\   
+\hline
+\end{tabular}  
+
+\section{命令帧}
+为了实现中心计算机对电源及配电的控制，中心计算机一共可发出4条指令，具体如下所示。
+
+\subsection{中心计算机指令}
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}  {|c|c|c|c|}  
+%\toprule[1pt]  
+\hline
+序号 & 字节定义(HEX) & 指令功能描述 & 参数\\ 
+\hline
+1 & 11 & 锂离子蓄电池放电开关控制 & 通、断\\ 
+\hline
+2 & B3 & 加热带控制指令 & 加热带序号\\ 
+\hline
+3 & E1 & 温度采集指令 & --\\ 
+\hline
+4 & F0 & 轮询指令 & --\\ 
+\hline
+\end{tabular}  
+
+\subsection{锂离子蓄电池放电开关控制指令}
+
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}  {|c|c|c|c|}  
+%\toprule[1pt]  
+\hline
+序号 & 描述& 字节定义(HEX) & 备注\\ 
+\hline
+1 & 帧头 & EB & \multirow{3}{*}{\tabincell{c}{1.指令计数加1;\\2.按参数要求执行动作}}\\ 
+\cline{1-3}
+2 & 帧头 & 90 & \\ 
+\cline{1-3}
+3 & 指令 & 11 &  \\ 
+\cline{1-3}
+4 & 通断参数 & \tabincell{c}{AAH:通;\\55H:断} &  \\ 
+\cline{1-3}
+5 &   CheckCode   & \tabincell{c}{(${DATA}_3+{DATA}_4$)的CRC校验码} &  \\  
+\hline
+\end{tabular}  
+
+\subsection{加热带控制指令}
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}{|c|c|c|c|}
+%\toprule[1pt]  
+\hline
+ 序号& 描述 & 字节定义 &  备注 \\ 
+\hline
+ 1& 帧头 & EB(HEX) & \multirow{5}{*}{\tabincell{c}{1.指令计数加1\\2.按参数要求执行动作\\3.如果加热总开关未打开,\\开启加热带操作不被执行.\\4.如果蓄电池余量低于预设30\%,\\则禁止开启加热}} \\ 
+\cline{1-3}
+ 2& 帧头 & 90(HEX)  &   \\ 
+\cline{1-3}
+ 3& 指令 & B3(HEX) &  \\ 
+\cline{1-3}
+ 4& 通断参数 & \tabincell{c}{D7,D6,D5,D4,D3,D2,D1,D0(BIN)\\ D0 $\sim$ D4表示加热带 1$\sim$ 加热带 5;\\工作状态,0表示未通电,1表示通电。D5$\sim$D7保留} &   \\ 
+\cline{1-3} 
+5 &   CheckCode   & \tabincell{c}{(${DATA}_3+{DATA}_4$)的CRC校验码} &  \\  
+\hline
+\end{tabular}
+
+\newpage{}
+
+\subsection{温度采集指令}
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}{|c|c|c|c|}
+%\toprule[1pt]  
+\hline
+  序号& 描述 & 字节定义(HEX) &  备注 \\ 
+ \hline
+ 1& 帧头 & EB & \multirow{5}{*}{\tabincell{c}{1.指令计数加1\\
+2.按参数要求执行动作}} \\ 
+\cline{1-3}
+ 2& 帧头 & 90 & \\ 
+\cline{1-3}
+ 3& 指令 & E1 &  \\ 
+\cline{1-3}
+ 4& 保留参数 & 00 &  \\ \cline{1-3} 
+5 &   CheckCode   & \tabincell{c}{(${DATA}_3+{DATA}_4$)的CRC校验码} &  \\ 
+\hline
+\end{tabular}
+
+\subsection{轮询指令}
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}{|l|l|l|l|l|}
+%\toprule[1pt]  
+\hline
+ 序号& 描述 & 字节定义(HEX) &  备注 \\ 
+\hline
+ 1& 帧头 & EB & \multirow{5}{*}{\tabincell{c}{1.指令计数加1\\
+2.按参数要求执行动作}} \\ 
+\cline{1-3}
+ 2& 帧头 & 90 &                   \\ 
+\cline{1-3}
+ 3& 指令 & F0 &                   \\ 
+\cline{1-3}
+ 4& 保留参数 & 00 &                   \\ 
+\cline{1-3}
+5 &   CheckCode   & \tabincell{c}{(${DATA}_3+{DATA}_4$)的CRC校验码} &  \\ 
+\hline
+\end{tabular} 
+
+\section{遥测参数帧}
+相机下位机收到命令帧的温度采集指令和轮询指令后，需要向中心机发送遥测参数帧，收到轮询指令后下位机发送的遥测参数帧，收到温度采集指令后下位机发送的遥测参数帧。
+\subsection{轮询遥测参数帧}
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|}
+%\toprule[1pt]  
+\hline
+          序号     &      描述                 & \multicolumn{8}{c|}{字节定义(HEX)}	&      备注              \\ \hline
+          1        &      帧头                 & \multicolumn{8}{c|}{EB 90}		&                    \\ \hline
+          2        &      节点号               & \multicolumn{8}{c|}{E1}			&                    \\ \hline
+          3        &      母线电压             & \multicolumn{8}{c|}{XX}   		& \multirow{11}{*}{取A/D转换数值的高8位} \\ \cline{1-10}
+          4        &      蓄电池组电压         & \multicolumn{8}{c|}{XX}   			&                    \\ \cline{1-10}
+          5        &      太阳阵输入电压       & \multicolumn{8}{c|}{XX} 			&                    \\ \cline{1-10}
+          6        &      升压占空比           & \multicolumn{8}{c|}{XX} 			&                    \\ \cline{1-10}
+          7        &      蓄电池单体 1 电压    & \multicolumn{8}{c|}{XX} 			&                    \\ \cline{1-10}
+          8        &      蓄电池单体 2 电压    & \multicolumn{8}{c|}{XX} 			&                    \\ \cline{1-10}
+          9        &      蓄电池单体 3 电压    & \multicolumn{8}{c|}{XX} 			&                    \\ \cline{1-10}
+          10       &      蓄电池单体 4 电压    & \multicolumn{8}{c|}{XX} 			&                    \\ \cline{1-10}
+          11       &      蓄电池单体 5 电压    & \multicolumn{8}{c|}{XX} 			&                    \\ \cline{1-10}
+          12       &      蓄电池单体 6 电压    & \multicolumn{8}{c|}{XX} 			&                    \\ \cline{1-10}
+          13       &      蓄电池单体 7 电压    & \multicolumn{8}{c|}{XX} 			&                    \\ \hline
+          14       &      电池容量             & \multicolumn{8}{c|}{XX}       &  电池相对容量       \\ \hline
+\end{tabular}
+
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|}
+\hline
+\multirow{8}{*}{15}& 
+\multirow{8}{*}{工作状态} & 
+\multirow{4}{*}{7} & 
+\multirow{4}{*}{6} & 
+\multirow{4}{*}{5} & 
+\multirow{4}{*}{4} & 
+\multirow{4}{*}{3} & 
+\multirow{4}{*}{2} & 
+\multirow{4}{*}{1} & 
+\multirow{4}{*}{0} & 
+\tabincell{c}{SCD=0,无短路;\\SCD=1,短路;} \\ \cline{11-11} 
+ &  &  &  &  &  &  &  &  &  & \tabincell{c}{OCD=0,无过流;\\OCD=1,过流;}\\  \cline{11-11} 
+ &  &  &  &  &  &  &  &  &  & \tabincell{c}{UV=0,过压保护;\\UV=1,过压保护;}\\  \cline{11-11} 
+ &  &  &  &  &  &  &  &  &  & \tabincell{c}{OVT=0,无欠压保护;\\OVT=1,欠压保护;}\\ \cline{3-11}
+ & &
+\multirow{4}{*}{CHG}  & 
+\multirow{4}{*}{DSG}  & 
+\multirow{4}{*}{VGOD} & 
+\multirow{4}{*}{OVT}  & 
+\multirow{4}{*}{UV}   & 
+\multirow{4}{*}{OV}   & 
+\multirow{4}{*}{OCD}  & 
+\multirow{4}{*}{SCD}  & 
+\tabincell{c}{VGOD=0,EEPROM\\电源无过压;\\VGOD=1,EEPROM\\电源过压;}\\  \cline{11-11} 
+ &  &  &  &  &  &  &  &  &  & \tabincell{c}{DSG=0；放电开关关;\\DSG=1；放电开关开;}\\  \cline{11-11} 
+ &  &  &  &  &  &  &  &  &  & \tabincell{c}{CHG=0; 充电开关关;\\CHG=1; 充电开关开;}\\   \cline{11-11} 
+ &  &  &  &  &  &  &  &  &  & \tabincell{c}{OV=0;无过压保护;\\OV=1;过压保护中;} \\ 
+\hline
+16 & 指令计数 			& \multicolumn{8}{c|}{XX} & \\ \hline
+17 & 最后一条指令 	&\multicolumn{8}{c|}{XX} & \\ \hline
+18 & 最后一条指令执行状态 &\multicolumn{8}{c|}{XX} &  \tabincell{c}{00H正确执行\\0XA0:总加热带开关未开\\而开启某加热带,返回错误,\\加热操作不被执行.\\0XB0:蓄电池容量低于阈\\值30\%,禁止加热带开启,\\加热操作不被执行} \\ \hline
+19  & 累加校验码 & \multicolumn{8}{c|}{(${DATA}_3+{DATA}_4+...+{DATA}_{18}$)的CRC校验码} &  \\  \hline
+\end{tabular}
+
+\subsection{温度遥测参数帧}
+
+\makeatletter\def\@captype{table}\makeatother 
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|}
+%\toprule[1pt]  
+\hline
+ 序号 & 描述   & \multicolumn{8}{c|}{字节定义(HEX)}	&  备注 \\ \hline
+ 1    & 帧头   & \multicolumn{8}{c|}{EB 90}				&       \\ \hline
+ 2    & 节点号 & \multicolumn{8}{c|}{F0}						&       \\ \hline
+\multirow{4}{*}{3} & 
+\multirow{4}{*}{加热带状态} & 
+\multicolumn{8}{c|}{\multirow{2}{*}{8位二进制数}} &
+\multirow{4}{*}{\tabincell{c}{D0$\sim$D4表示1$\sim$5个加热
+带,\\数值为0时加热带断电,数值为1时,加热带通电;\\D7表示加热带
+总开关，总开关为1表示可以加热，\\总开关为0表示不能加热}} \\ 
+ & & \multicolumn{8}{c|}{} & \\  \cline{3-10}
+ & & \multirow{2}{*}{D7} & 
+\multirow{2}{*}{X} & 
+\multirow{2}{*}{X} & 
+\multirow{2}{*}{D4} & 
+\multirow{2}{*}{D3} & 
+\multirow{2}{*}{D2} &  
+\multirow{2}{*}{D1} & 
+\multirow{2}{*}{D0} & \\ 
+ & & & & & & &  & & & \\
+\hline
+4 & 采温点 1 & \multicolumn{8}{c|}{XX} & \multirow{5}{*}{取 A/D 转换数值的高 8 位} \\ \cline{1-10}
+5 & 采温点 2 & \multicolumn{8}{c|}{XX} & \\ \cline{1-10}
+6 & 采温点 3 & \multicolumn{8}{c|}{XX} & \\ \cline{1-10}
+7 & 采温点 4 & \multicolumn{8}{c|}{XX} & \\ \cline{1-10}
+8 & 采温点 5 & \multicolumn{8}{c|}{XX} & \\ \hline
+9 & 累加校验码 & \multicolumn{8}{c|}{(${DATA}_3+{DATA}_4+...+{DATA}_8$)的CRC校验码} &  \\  \hline
+\end{tabular}
+
+
+
+
+\appendix
+
+\end{document}
