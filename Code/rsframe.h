@@ -27,7 +27,7 @@ struct Pollings{        //定义轮询遥测数据
     unsigned char vlot_ratio;   //升压占空比
     unsigned char *volts;       //单体电压数据
     unsigned char volume;       //电池容量
-    unsigned char work_state;       //工作状态
+    unsigned char work_state;   //工作状态
     unsigned char indexs;       //指令计数
     unsigned char last_cmd;     //最后一条指令
     unsigned char last_state;   //最后一条指令状态
