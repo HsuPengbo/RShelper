@@ -19,6 +19,7 @@ Widget::Widget(QWidget *parent)
     ui->elecOpenButton->setEnabled(false);
     ui->elecStopButton->setEnabled(false);
     ui->baudrateBox->setCurrentIndex(5);
+    //test();
 }
 
 Widget::~Widget()
@@ -100,20 +101,14 @@ void Widget::on_recv_timer()//接收数据定时器
 }
 void Widget::test()
 {
-    QString str=QString("EB90111213141516178C1920212223242526274D");//EB90111213141516178C
+    QString str=QString("EB90111213141516178C1920212223242526273C");//EB90111213141516178C
     QString header=QString("EB90");
     str=str.toUpper();
     int ipos=str.indexOf(header);
     if(ipos==0){
         QStringList recvs= str.split(header);
         for(int i=1;i<recvs.size();++i){
-            QString recv = ui->recvTextEdit->toPlainText();
-            ui->recvTextEdit->clear();
             QString bag=recvs.at(i);
-            recv += QString(bag);
-            recv += QString("\n");
-            RecvIndex++;
-            ui->RecvNumber->display(RecvIndex);
             if(bag.size()==36){
                 display_Polling(bag);
                 qDebug()<<"recv polling data:"<<bag;
@@ -122,7 +117,6 @@ void Widget::test()
                 display_Temp(bag);
                 qDebug()<<"recv temperature data:"<<bag;
             }
-            ui->recvTextEdit->append(bag);
         }
         qDebug()<<"recv:"<<str;
     }
@@ -238,11 +232,10 @@ void Widget::on_ZoneButton_clicked()            //加热带控制指令
 
 void Widget::display_Temp(QString bag)          //展示遥测参数
 {
-    //111213141516178C
     int nums[8]={0};
     int bins[8]={0};
     int cc=0;
-    for(int i=0;i<7;++i){
+    for(int i=1;i<7;++i){
         nums[i]=hex2dec(bag.mid(i*2,2));
         cc+=nums[i];
     }
@@ -274,11 +267,10 @@ void Widget::display_Temp(QString bag)          //展示遥测参数
 }
 void Widget::display_Polling(QString bag)       //展示轮询参数
 {
-    //11121314151617181920212223242526274D
     int nums[18]={0};
     int bins[8]={0};
     int cc=0;
-    for(int i=0;i<17;++i){
+    for(int i=1;i<17;++i){
         nums[i]=hex2dec(bag.mid(i*2,2));
         cc+=nums[i];
     }
@@ -330,7 +322,7 @@ void Widget::display_SendEdit(QString bag)                 //更新发送区
 {
     QString send = ui->sendTextEdit->toPlainText();
     QDateTime current_date_time =QDateTime::currentDateTime();
-    QString  cur_time = current_date_time.toString("yyyy.MM.dd hh:mm:ss");
+    QString  cur_time = current_date_time.toString("hh:mm:ss");
     send += (cur_time+QString(":")+bag+QString("\n"));
     ui->sendTextEdit->clear();
     ui->sendTextEdit->append(send);
@@ -342,8 +334,8 @@ void Widget::display_RecvEdit(QString bag)                 //更新接收区
 {
     QString recv = ui->recvTextEdit->toPlainText();
     QDateTime current_date_time =QDateTime::currentDateTime();
-    QString  cur_time = current_date_time.toString("yyyy.MM.dd hh:mm:ss");
-    recv += (cur_time+QString(":")+bag+QString("\n"));
+    QString  cur_time = current_date_time.toString("hh:mm:ss ");
+    recv += (cur_time+QString(" : ")+bag+QString("\n"));
     ui->recvTextEdit->clear();
     ui->recvTextEdit->append(recv);
     RecvIndex++;
