@@ -1,11 +1,12 @@
-#include "mainwindow.h"
+#include "widget.h"
 
 #include <QApplication>
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    MainWindow w;
+    Widget w;
+    w.setWindowTitle("Power Assistant");
     w.show();
     return a.exec();
 }
